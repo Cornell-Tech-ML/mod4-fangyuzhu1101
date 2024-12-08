@@ -34,3 +34,13 @@ python sync_previous_module.py previous-module-dir current-module-dir
 The files that will be synced are:
 
         minitorch/tensor_data.py minitorch/tensor_functions.py minitorch/tensor_ops.py minitorch/operators.py minitorch/scalar.py minitorch/scalar_functions.py minitorch/module.py minitorch/autodiff.py minitorch/module.py project/run_manual.py project/run_scalar.py project/run_tensor.py minitorch/operators.py minitorch/module.py minitorch/autodiff.py minitorch/tensor.py minitorch/datasets.py minitorch/testing.py minitorch/optim.py minitorch/tensor_ops.py minitorch/fast_ops.py minitorch/cuda_ops.py project/parallel_check.py tests/test_tensor_general.py
+
+
+# Training Logs
+
+This repository contains training logs for two models: Sentiment Analysis (SST2) and Digit Classification (MNIST).
+
+## Links to Training Logs
+
+- [Sentiment Analysis Logs (sentiment.txt)](sentiment.txt): Includes train loss, train accuracy, and validation accuracy for the SST2 dataset. The model achieves over 70% validation accuracy.
+- [Digit Classification Logs (mnist.txt)](mnist.txt): Includes train loss and validation accuracy (out of 16) for the MNIST dataset.

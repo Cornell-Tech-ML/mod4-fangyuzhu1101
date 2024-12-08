@@ -11,6 +11,48 @@ def RParam(*shape):
     r = 2 * (minitorch.rand(shape) - 0.5)
     return minitorch.Parameter(r)
 
+# TODO: Implement for Task 2.5.
+class Network(minitorch.Module):
+    def __init__(self, hidden_layers):
+        super().__init__()
+
+        # Submodules
+        self.layer1 = Linear(2, hidden_layers)
+        self.layer2 = Linear(hidden_layers, hidden_layers)
+        self.layer3 = Linear(hidden_layers, 1)
+
+    def forward(self, x):
+        # ASSIGN2.5
+        h = self.layer1.forward(x).relu()
+        h = self.layer2.forward(h).relu()
+        return self.layer3.forward(h).sigmoid()
+        # END ASSIGN2.5
+
+class Linear(minitorch.Module):
+    def __init__(self, in_size, out_size):
+        super().__init__()
+        self.weights = RParam(in_size, out_size)
+        self.bias = RParam(out_size)
+        self.out_size = out_size
+
+    def forward(self, x):
+        """Manually implement matrix multiplication by broadcasting inputs and weights for element-wise multiplication;
+        with the equation of `x @ self.weights.value + self.bias.value`;
+        Inputs x typically has a shape of (batch_size, input_size), whereas the weights self.weights
+        typically has a shape of (input_size, output_size); Normally, matrix multiplication multiplies
+        (batch_size, input_size) matrix by an (input_size, output_size) matrix, resulting in a
+        (batch_size, output_size) output. However, we are manually implementing matrix multiplication
+        (element-wise multiplication followed by summing), we need to align the shapes of x and self.weights
+        so that broadcasting can occur correctly. For element-wise multiplication, we need to reshape using
+        .view both x and weights to ensure that each element of x multiplies with the correct element in weights."""
+        # ASSIGN2.5
+        batch, in_size = x.shape
+        return (
+            self.weights.value.view(1, in_size, self.out_size)
+            * x.view(batch, in_size, 1)
+        ).sum(1).view(batch, self.out_size) + self.bias.value.view(self.out_size)
+        # END ASSIGN2.5
+
 
 def default_log_fn(epoch, total_loss, correct, losses):
     print("Epoch ", epoch, " loss ", total_loss, "correct", correct)
