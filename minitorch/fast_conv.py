@@ -1,14 +1,11 @@
 from typing import Tuple, TypeVar, Any
 
-import numpy as np
 from numba import prange
 from numba import njit as _njit
 
 from .autodiff import Context
 from .tensor import Tensor
 from .tensor_data import (
-    MAX_DIMS,
-    Index,
     Shape,
     Strides,
     Storage,
@@ -22,6 +19,7 @@ Fn = TypeVar("Fn")
 
 
 def njit(fn: Fn, **kwargs: Any) -> Fn:
+    """Wraps a function with Numba's just-in-time compilation with specific options."""
     return _njit(inline="always", **kwargs)(fn)  # type: ignore
 
 
@@ -91,7 +89,52 @@ def _tensor_conv1d(
     s2 = weight_strides
 
     # TODO: Implement for Task 4.1.
-    raise NotImplementedError("Need to implement for Task 4.1")
+    for curr_batch_idx in prange(batch_):
+        for curr_out_channel_idx in prange(out_channels):
+            for curr_out_width_idx in prange(out_width):
+                # Compute the index of the current output element
+                # out[curr_batch, curr_out_channel, curr_width]
+                out_pos_ordinal = (
+                    out_strides[0] * curr_batch_idx
+                    + out_strides[1] * curr_out_channel_idx
+                    + out_strides[2] * curr_out_width_idx
+                )
+
+                for curr_in_channel_idx in prange(in_channels):
+                    for curr_kw in prange(kw):
+                        # Determine the range of kernel positions based on the reverse flag
+                        # `reverse` decides if weight is anchored left (False) or right.
+                        if reverse:
+                            curr_kw = kw - curr_kw - 1
+
+                        # Compute input and weight position indices
+                        # weight[curr_out_channel, curr_in_channel_idx, curr_kw]
+                        weight_pos_ordinal = (
+                            s2[0] * curr_out_channel_idx
+                            + s2[1] * curr_in_channel_idx
+                            + s2[2] * curr_kw
+                        )
+                        input_pos_ordinal = 0
+                        width_offset_backward = curr_out_width_idx - curr_kw
+                        width_offset_forward = curr_out_width_idx + curr_kw
+                        if reverse and 0 <= width_offset_backward:
+                            # input[curr_batch, curr_in_channel_idx , curr_width - curr_kw]
+                            input_pos_ordinal = (
+                                s1[0] * curr_batch_idx
+                                + s1[1] * curr_in_channel_idx
+                                + s1[2] * width_offset_backward
+                            )
+                        elif not reverse and width_offset_forward < width:
+                            # input[curr_batch, curr_in_channel_idx , curr_width - curr_kw]
+                            input_pos_ordinal = (
+                                s1[0] * curr_batch_idx
+                                + s1[1] * curr_in_channel_idx
+                                + s1[2] * width_offset_forward
+                            )
+                        # Accumulate the final convolution result
+                        out[out_pos_ordinal] += (
+                            input[input_pos_ordinal] * weight[weight_pos_ordinal]
+                        )
 
 
 tensor_conv1d = njit(_tensor_conv1d, parallel=True)
@@ -127,6 +170,20 @@ class Conv1dFun(Function):
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+        """Compute the gradient of a 1D Convolution with respect to the input and weight tensors during the backward pass.
+
+        Args:
+        ----
+            ctx : Context - Stores the saved input and weight tensors from the forward pass.
+            grad_output : Tensor - Gradient of the loss with respect to the output of the convolution (batch x out_channel x w).
+
+        Returns:
+        -------
+            Tuple[Tensor, Tensor]
+                - Gradient with respect to the input tensor (batch x in_channel x w).
+                - Gradient with respect to the weight tensor (out_channel x in_channel x kw).
+
+        """
         input, weight = ctx.saved_values
         batch, in_channels, w = input.shape
         out_channels, in_channels, kw = weight.shape
@@ -220,7 +277,78 @@ def _tensor_conv2d(
     s20, s21, s22, s23 = s2[0], s2[1], s2[2], s2[3]
 
     # TODO: Implement for Task 4.2.
-    raise NotImplementedError("Need to implement for Task 4.2")
+    for curr_batch_idx in prange(batch_):
+        for curr_out_channels_idx in prange(out_channels):
+            # out_shape[2] == height_
+            for curr_out_height_idx in prange(out_shape[2]):
+                # out_shape[3] == width_
+                for curr_out_width_idx in prange(out_shape[3]):
+                    out_pos_ordinal = (
+                        out_strides[0] * curr_batch_idx
+                        + out_strides[1] * curr_out_channels_idx
+                        + out_strides[2] * curr_out_height_idx
+                        + out_strides[3] * curr_out_width_idx
+                    )
+                    for curr_in_channel_idx in prange(in_channels):
+                        # handle and loop through for each kh and each kw
+                        for curr_kh in prange(kh):
+                            for curr_kw in prange(kw):
+                                if reverse:
+                                    height_offset_backward = (
+                                        curr_out_height_idx - curr_kh
+                                    )
+                                    width_offset_backward = curr_out_width_idx - curr_kw
+                                    # if reverse flagged and the offset is larger and equal to zero
+                                    if (
+                                        height_offset_backward >= 0
+                                        and width_offset_backward >= 0
+                                    ):
+                                        input_inner_pos_ordinal = (
+                                            s10 * curr_batch_idx
+                                            + s11 * curr_in_channel_idx
+                                            + s12 * height_offset_backward
+                                            + s13 * width_offset_backward
+                                        )
+                                        weight_inner_pos_ordinal = (
+                                            s20 * curr_out_channels_idx
+                                            + s21 * curr_in_channel_idx
+                                            + s22 * curr_kh
+                                            + s23 * curr_kw
+                                        )
+                                        out[out_pos_ordinal] += (
+                                            input[input_inner_pos_ordinal]
+                                            * weight[weight_inner_pos_ordinal]
+                                        )
+                                    else:
+                                        out[out_pos_ordinal] += 0
+                                else:
+                                    height_offset_forward = (
+                                        curr_out_height_idx + curr_kh
+                                    )
+                                    width_offset_forward = curr_out_width_idx + curr_kw
+                                    # if not reverse flagged and the offset is smaller than height or width
+                                    if (
+                                        height_offset_forward < height
+                                        and width_offset_forward < width
+                                    ):
+                                        input_inner_pos_ordinal = (
+                                            s10 * curr_batch_idx
+                                            + s11 * curr_in_channel_idx
+                                            + s12 * height_offset_forward
+                                            + s13 * width_offset_forward
+                                        )
+                                        weight_inner_pos_ordinal = (
+                                            s20 * curr_out_channels_idx
+                                            + s21 * curr_in_channel_idx
+                                            + s22 * curr_kh
+                                            + s23 * curr_kw
+                                        )
+                                        out[out_pos_ordinal] += (
+                                            input[input_inner_pos_ordinal]
+                                            * weight[weight_inner_pos_ordinal]
+                                        )
+                                    else:
+                                        out[out_pos_ordinal] += 0
 
 
 tensor_conv2d = njit(_tensor_conv2d, parallel=True, fastmath=True)
@@ -254,6 +382,20 @@ class Conv2dFun(Function):
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+        """Compute the gradient of a 2D Convolution with respect to the input and weight tensors during the backward pass.
+
+        Args:
+        ----
+            ctx : Context - Stores the saved input and weight tensors from the forward pass.
+            grad_output : Tensor - Gradient of the loss with respect to the output of the convolution (batch x out_channel x h x w).
+
+        Returns:
+        -------
+            Tuple[Tensor, Tensor]
+                - Gradient with respect to the input tensor (batch x in_channel x h x w).
+                - Gradient with respect to the weight tensor (out_channel x in_channel x kh x kw).
+
+        """
         input, weight = ctx.saved_values
         batch, in_channels, h, w = input.shape
         out_channels, in_channels, kh, kw = weight.shape

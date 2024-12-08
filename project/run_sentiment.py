@@ -35,7 +35,7 @@ class Conv1d(minitorch.Module):
 
     def forward(self, input):
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        return minitorch.conv1d(input, self.weights.value) + self.bias.value
 
 
 class CNNSentimentKim(minitorch.Module):
@@ -62,14 +62,33 @@ class CNNSentimentKim(minitorch.Module):
         super().__init__()
         self.feature_map_size = feature_map_size
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.dropout = dropout
+        # convolutional layers with kernel sizes [3, 4, 5] respectively
+        self.conv1d_1 = Conv1d(embedding_size, feature_map_size, filter_sizes[0])
+        self.conv1d_2 = Conv1d(embedding_size, feature_map_size, filter_sizes[1])
+        self.conv1d_3 = Conv1d(embedding_size, feature_map_size, filter_sizes[2])
+        self.linear = Linear(feature_map_size, 1)
 
     def forward(self, embeddings):
         """
         embeddings tensor: [batch x sentence length x embedding dim]
         """
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # [batch x embedding dim x sentence length]
+        embeddings = embeddings.permute(0, 2, 1)
+        # Apply 1D Convolutions
+        conv_1 = self.conv1d_1.forward(embeddings).relu()
+        conv_2 = self.conv1d_2.forward(embeddings).relu()
+        conv_3 = self.conv1d_3.forward(embeddings).relu()
+        # Apply Max-Over-Time Pooling
+        # The results from the three convolution layers are added together element-wise
+        # Explicitly reshapes the pooled output for the linear layer
+        output = (minitorch.max(conv_1, 2) + minitorch.max(conv_2, 2) + minitorch.max(conv_3, 2)).view(embeddings.shape[0], self.feature_map_size)
+        # Correctly respects the training flag, ensuring appropriate behavior during evaluation
+        output = minitorch.dropout(output, rate=self.dropout, ignore=not self.training)
+        # Apply Linear Layer
+        output = self.linear.forward(output)
+        return output.sigmoid().view(embeddings.shape[0])
 
 
 # Evaluation helper methods
