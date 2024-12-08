@@ -67,7 +67,7 @@ class CNNSentimentKim(minitorch.Module):
         self.conv1d_1 = Conv1d(embedding_size, feature_map_size, filter_sizes[0])
         self.conv1d_2 = Conv1d(embedding_size, feature_map_size, filter_sizes[1])
         self.conv1d_3 = Conv1d(embedding_size, feature_map_size, filter_sizes[2])
-        self.linear = Linear(feature_map_size, 1)
+        self.linear_layer = Linear(feature_map_size, 1)
 
     def forward(self, embeddings):
         """
@@ -80,15 +80,21 @@ class CNNSentimentKim(minitorch.Module):
         conv_1 = self.conv1d_1.forward(embeddings).relu()
         conv_2 = self.conv1d_2.forward(embeddings).relu()
         conv_3 = self.conv1d_3.forward(embeddings).relu()
-        # Apply Max-Over-Time Pooling
-        # The results from the three convolution layers are added together element-wise
-        # Explicitly reshapes the pooled output for the linear layer
-        output = (minitorch.max(conv_1, 2) + minitorch.max(conv_2, 2) + minitorch.max(conv_3, 2)).view(embeddings.shape[0], self.feature_map_size)
+        # Each applies max-over-time pooling along the second dimension (axis 2) of conv_1, conv_2, and conv_3
+        # Adds the pooled feature maps element-wise from the three convolution layers
+        # out=pooled(conv1)+pooled(conv2)+pooled(conv3)
+        add_layers = minitorch.max(conv_1, 2) + minitorch.max(conv_2, 2) + minitorch.max(conv_3, 2)
+        # reshape into the same shape: [batch_size x feature_map_size]
+        add_layers_reshape = add_layers.view(embeddings.shape[0], self.feature_map_size)
         # Correctly respects the training flag, ensuring appropriate behavior during evaluation
-        output = minitorch.dropout(output, rate=self.dropout, ignore=not self.training)
+        # during training mode: if self.training == true --> ignore=not self.training=false, so dropout is applied if not ignored
+        add_layers_reshape = minitorch.dropout(add_layers_reshape, rate=self.dropout, ignore=not self.training)
+        # Else during evaluation (self.training == False):
+        # The condition if self.training evaluates to False --> ignore=not self.training=true; dropout is not called, so no dropout is applied.
         # Apply Linear Layer
-        output = self.linear.forward(output)
-        return output.sigmoid().view(embeddings.shape[0])
+        fc1_out = self.linear_layer.forward(add_layers_reshape)
+        output = fc1_out.sigmoid().view(embeddings.shape[0])
+        return output
 
 
 # Evaluation helper methods
