@@ -34,22 +34,22 @@ def test_max(t: Tensor) -> None:
     # TODO: Implement for Task 4.4.
     x, y, z = t.shape  # should be x = 2, y = 3, and z = 4
     output = minitorch.nn.max(t, 0)
-    assert_close(
-        output[0, 0, 0], max([t[i, 0, 0] for i in range(x)])
-    )
+    assert_close(output[0, 0, 0], max([t[i, 0, 0] for i in range(x)]))
 
     output = minitorch.nn.max(t, 1)
-    assert_close(
-        output[0, 0, 0], max([t[0, j, 0] for j in range(y)])
-    )
+    assert_close(output[0, 0, 0], max([t[0, j, 0] for j in range(y)]))
 
     output = minitorch.nn.max(t, 2)
-    assert_close(
-        output[0, 0, 0], max([t[0, 0, k] for k in range(z)])
+    assert_close(output[0, 0, 0], max([t[0, 0, k] for k in range(z)]))
+    minitorch.grad_check(
+        lambda a: minitorch.nn.max(a, dim=0), t + minitorch.rand(t.shape) * 1e-3
     )
-    minitorch.grad_check(lambda a: minitorch.nn.max(a, dim=0), t + minitorch.rand(t.shape) * 1e-3)
-    minitorch.grad_check(lambda a: minitorch.nn.max(a, dim=1), t + minitorch.rand(t.shape) * 1e-3)
-    minitorch.grad_check(lambda a: minitorch.nn.max(a, dim=2), t + minitorch.rand(t.shape) * 1e-3)
+    minitorch.grad_check(
+        lambda a: minitorch.nn.max(a, dim=1), t + minitorch.rand(t.shape) * 1e-3
+    )
+    minitorch.grad_check(
+        lambda a: minitorch.nn.max(a, dim=2), t + minitorch.rand(t.shape) * 1e-3
+    )
 
 
 @pytest.mark.task4_4
