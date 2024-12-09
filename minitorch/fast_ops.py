@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar, Any
 
 import numpy as np
-from numba import njit, prange
+from numba import prange
+from numba import njit as _njit
 
 from .tensor_data import (
     MAX_DIMS,
@@ -15,7 +16,7 @@ from .tensor_data import (
 from .tensor_ops import MapProto, TensorOps
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional
+    from typing import Callable, Optional
 
     from .tensor import Tensor
     from .tensor_data import Index, Shape, Storage, Strides
@@ -25,9 +26,17 @@ if TYPE_CHECKING:
 # This code will JIT compile fast versions your tensor_data functions.
 # If you get an error, read the docs for NUMBA as to what is allowed
 # in these functions.
-to_index = njit(inline="always")(to_index)
-index_to_position = njit(inline="always")(index_to_position)
-broadcast_index = njit(inline="always")(broadcast_index)
+Fn = TypeVar("Fn")
+
+
+def njit(fn: Fn, **kwargs: Any) -> Fn:
+    """Wraps a function with Numba's just-in-time compilation with specific options."""
+    return _njit(inline="always", **kwargs)(fn)  # type: ignore
+
+
+to_index = njit(to_index)
+index_to_position = njit(index_to_position)
+broadcast_index = njit(broadcast_index)
 
 
 class FastOps(TensorOps):
@@ -35,7 +44,7 @@ class FastOps(TensorOps):
     def map(fn: Callable[[float], float]) -> MapProto:
         """See `tensor_ops.py`"""
         # This line JIT compiles your tensor_map
-        f = tensor_map(njit()(fn))
+        f = tensor_map(njit(fn))
 
         def ret(a: Tensor, out: Optional[Tensor] = None) -> Tensor:
             if out is None:
@@ -48,7 +57,7 @@ class FastOps(TensorOps):
     @staticmethod
     def zip(fn: Callable[[float, float], float]) -> Callable[[Tensor, Tensor], Tensor]:
         """See `tensor_ops.py`"""
-        f = tensor_zip(njit()(fn))
+        f = tensor_zip(njit(fn))
 
         def ret(a: Tensor, b: Tensor) -> Tensor:
             c_shape = shape_broadcast(a.shape, b.shape)
@@ -63,7 +72,7 @@ class FastOps(TensorOps):
         fn: Callable[[float, float], float], start: float = 0.0
     ) -> Callable[[Tensor, int], Tensor]:
         """See `tensor_ops.py`"""
-        f = tensor_reduce(njit()(fn))
+        f = tensor_reduce(njit(fn))
 
         def ret(a: Tensor, dim: int) -> Tensor:
             out_shape = list(a.shape)
@@ -131,7 +140,9 @@ class FastOps(TensorOps):
 # Implementations
 
 
-def tensor_map(fn: Callable[[float], float]) -> Any:
+def tensor_map(
+    fn: Callable[[float], float],
+) -> Callable[[Storage, Shape, Strides, Storage, Shape, Strides], None]:
     """NUMBA low_level tensor_map function. See `tensor_ops.py` for description.
 
     Optimizations:
@@ -194,10 +205,14 @@ def tensor_map(fn: Callable[[float], float]) -> Any:
                 out[i] = fn(in_storage[i])
         # END ASSIGN3.1
 
-    return njit(parallel=True)(_map)
+    return njit(_map, parallel=True)  # type: ignore
 
 
-def tensor_zip(fn: Callable[[float, float], float]) -> Any:
+def tensor_zip(
+    fn: Callable[[float, float], float],
+) -> Callable[
+    [Storage, Shape, Strides, Storage, Shape, Strides, Storage, Shape, Strides], None
+]:
     """NUMBA higher-order tensor zip function. See `tensor_ops.py` for description.
 
     Optimizations:
@@ -277,10 +292,12 @@ def tensor_zip(fn: Callable[[float, float], float]) -> Any:
                 out[i] = fn(a_storage[i], b_storage[i])
         # END ASSIGN3.1
 
-    return njit(parallel=True)(_zip)
+    return njit(_zip, parallel=True)  # type: ignore
 
 
-def tensor_reduce(fn: Callable[[float, float], float]) -> Any:
+def tensor_reduce(
+    fn: Callable[[float, float], float],
+) -> Callable[[Storage, Shape, Strides, Storage, Shape, Strides, int], None]:
     """NUMBA higher-order tensor reduce function. See `tensor_ops.py` for description.
 
     Optimizations:
@@ -338,7 +355,7 @@ def tensor_reduce(fn: Callable[[float, float], float]) -> Any:
             out[o] = accum
         # END ASSIGN3.1
 
-    return njit(parallel=True)(_reduce)
+    return njit(_reduce, parallel=True)  # type: ignore
 
 
 def _tensor_matrix_multiply(
@@ -416,4 +433,4 @@ def _tensor_matrix_multiply(
     # END ASSIGN3.2
 
 
-tensor_matrix_multiply = njit(parallel=True, fastmath=True)(_tensor_matrix_multiply)
+tensor_matrix_multiply = njit(_tensor_matrix_multiply, parallel=True)  # type: ignore
