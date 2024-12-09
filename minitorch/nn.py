@@ -145,6 +145,7 @@ def logsoftmax(input: Tensor, dim: int) -> Tensor:
         Tensor : the log of the softmax tensor
 
     """
+    # Implemented using the logsumexp, where the max is subtracted then added back in
     maximium_i = max(input, dim=dim)
     output = input - maximium_i - ((input - maximium_i).exp().sum(dim=dim).log())
     return output
