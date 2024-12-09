@@ -33,6 +33,7 @@ def test_avg(t: Tensor) -> None:
 def test_max(t: Tensor) -> None:
     # TODO: Implement for Task 4.4.
     x, y, z = t.shape  # should be x = 2, y = 3, and z = 4
+    # testing forward
     output = minitorch.nn.max(t, 0)
     assert_close(output[0, 0, 0], max([t[i, 0, 0] for i in range(x)]))
 
@@ -41,14 +42,15 @@ def test_max(t: Tensor) -> None:
 
     output = minitorch.nn.max(t, 2)
     assert_close(output[0, 0, 0], max([t[0, 0, k] for k in range(z)]))
+    # testing backward
     minitorch.grad_check(
-        lambda a: minitorch.nn.max(a, dim=0), t + minitorch.rand(t.shape) * 1e-3
+        lambda a: minitorch.nn.max(a, dim=0), t + minitorch.rand(t.shape)
     )
     minitorch.grad_check(
-        lambda a: minitorch.nn.max(a, dim=1), t + minitorch.rand(t.shape) * 1e-3
+        lambda a: minitorch.nn.max(a, dim=1), t + minitorch.rand(t.shape)
     )
     minitorch.grad_check(
-        lambda a: minitorch.nn.max(a, dim=2), t + minitorch.rand(t.shape) * 1e-3
+        lambda a: minitorch.nn.max(a, dim=2), t + minitorch.rand(t.shape)
     )
 
 
