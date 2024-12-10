@@ -86,13 +86,13 @@ class CNNSentimentKim(minitorch.Module):
         add_layers = minitorch.max(conv_1, 2) + minitorch.max(conv_2, 2) + minitorch.max(conv_3, 2)
         # reshape into the same shape: [batch_size x feature_map_size]
         add_layers_reshape = add_layers.view(embeddings.shape[0], self.feature_map_size)
+        # Apply Linear Layer, should no ReLu applied after the Linear layer, only the dropout 
+        fc1_out = self.linear_layer.forward(add_layers_reshape)
         # Correctly respects the training flag, ensuring appropriate behavior during evaluation
         # during training mode: if self.training == true --> ignore=not self.training=false, so dropout is applied if not ignored
-        add_layers_reshape = minitorch.dropout(add_layers_reshape, rate=self.dropout, ignore=not self.training)
+        fc1_out = minitorch.dropout(fc1_out, rate=self.dropout, ignore=not self.training)
         # Else during evaluation (self.training == False):
         # The condition if self.training evaluates to False --> ignore=not self.training=true; dropout is not called, so no dropout is applied.
-        # Apply Linear Layer
-        fc1_out = self.linear_layer.forward(add_layers_reshape)
         output = fc1_out.sigmoid().view(embeddings.shape[0])
         return output
 

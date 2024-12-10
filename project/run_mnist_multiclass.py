@@ -88,7 +88,7 @@ class Network(minitorch.Module):
         self.mid = self.conv_1.forward(x).relu()
         # Second convolution + ReLU
         self.out = self.conv_2.forward(self.mid).relu()
-        # 2D pooling + Flatten
+        # 2D pooling + Flatten; (either Avg or Max) with 4x4 kernel
         pooled = minitorch.avgpool2d(self.out, (4, 4)).view(BATCH, 392)
         # First fully connected layer + ReLU
         # ReLU is applied to the output of the first linear layer before dropout,
