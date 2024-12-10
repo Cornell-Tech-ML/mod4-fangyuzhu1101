@@ -42,7 +42,7 @@ class Conv2d(minitorch.Module):
 
     def forward(self, input):
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        return minitorch.conv2d(input, self.weights.value) + self.bias.value
 
 
 class Network(minitorch.Module):
@@ -68,11 +68,43 @@ class Network(minitorch.Module):
         self.out = None
 
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # Number of classes (10 digits), C = 10
+        self.classes = C
+        self.dropout = 0.25
+        # Convolutional layers
+        # Input: 1 channel, Output: 4 channels, Kernel: 3x3
+        self.conv_1 = Conv2d(1, 4, 3, 3)
+        # Input: 4 channels, Output: 8 channels, Kernel: 3x3
+        self.conv_2 = Conv2d(4, 8, 3, 3)
+        # Fully connected layers
+        # Flattened size 392 to 64
+        self.linear_layer_1 = Linear(392, 64)
+        # Output layer to `num_classes`
+        self.linear_layer_2 = Linear(64, self.classes)
 
     def forward(self, x):
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # First convolution + ReLU
+        self.mid = self.conv_1.forward(x).relu()
+        # Second convolution + ReLU
+        self.out = self.conv_2.forward(self.mid).relu()
+        # 2D pooling + Flatten; (either Avg or Max) with 4x4 kernel
+        pooled = minitorch.avgpool2d(self.out, (4, 4)).view(BATCH, 392)
+        # First fully connected layer + ReLU
+        # ReLU is applied to the output of the first linear layer before dropout,
+        # ensures that the network benefits from the non-linear transformations
+        # before reducing the dimensionality through dropout
+        fc1_out = self.linear_layer_1.forward(pooled).relu()
+        # Correctly respects the training flag, ensuring appropriate behavior during evaluation
+        # during training mode: if self.training == true --> ignore=not self.training=false, so dropout is applied if not ignored
+        fc1_out = minitorch.dropout(fc1_out, rate=self.dropout, ignore=not self.training)
+        # Else during evaluation (self.training == False):
+        # The condition if self.training evaluates to False --> ignore=not self.training=true; dropout is not called, so no dropout is applied.
+        # Second fully connected layer (output layer)
+        fc2_out = self.linear_layer_2.forward(fc1_out)
+        # Log-softmax activation
+        output = minitorch.logsoftmax(fc2_out, dim=1)
+        return output
 
 
 def make_mnist(start, stop):

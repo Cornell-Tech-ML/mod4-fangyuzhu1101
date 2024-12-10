@@ -35,7 +35,7 @@ class Conv1d(minitorch.Module):
 
     def forward(self, input):
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        return minitorch.conv1d(input, self.weights.value) + self.bias.value
 
 
 class CNNSentimentKim(minitorch.Module):
@@ -62,14 +62,39 @@ class CNNSentimentKim(minitorch.Module):
         super().__init__()
         self.feature_map_size = feature_map_size
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.dropout = dropout
+        # convolutional layers with kernel sizes [3, 4, 5] respectively
+        self.conv1d_1 = Conv1d(embedding_size, feature_map_size, filter_sizes[0])
+        self.conv1d_2 = Conv1d(embedding_size, feature_map_size, filter_sizes[1])
+        self.conv1d_3 = Conv1d(embedding_size, feature_map_size, filter_sizes[2])
+        self.linear_layer = Linear(feature_map_size, 1)
 
     def forward(self, embeddings):
         """
         embeddings tensor: [batch x sentence length x embedding dim]
         """
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # [batch x embedding dim x sentence length]
+        embeddings = embeddings.permute(0, 2, 1)
+        # Apply 1D Convolutions
+        conv_1 = self.conv1d_1.forward(embeddings).relu()
+        conv_2 = self.conv1d_2.forward(embeddings).relu()
+        conv_3 = self.conv1d_3.forward(embeddings).relu()
+        # Each applies max-over-time pooling along the second dimension (axis 2) of conv_1, conv_2, and conv_3
+        # Adds the pooled feature maps element-wise from the three convolution layers
+        # out=pooled(conv1)+pooled(conv2)+pooled(conv3)
+        add_layers = minitorch.max(conv_1, 2) + minitorch.max(conv_2, 2) + minitorch.max(conv_3, 2)
+        # reshape into the same shape: [batch_size x feature_map_size]
+        add_layers_reshape = add_layers.view(embeddings.shape[0], self.feature_map_size)
+        # Apply Linear Layer, should no ReLu applied after the Linear layer, only the dropout
+        fc1_out = self.linear_layer.forward(add_layers_reshape)
+        # Correctly respects the training flag, ensuring appropriate behavior during evaluation
+        # during training mode: if self.training == true --> ignore=not self.training=false, so dropout is applied if not ignored
+        fc1_out = minitorch.dropout(fc1_out, rate=self.dropout, ignore=not self.training)
+        # Else during evaluation (self.training == False):
+        # The condition if self.training evaluates to False --> ignore=not self.training=true; dropout is not called, so no dropout is applied.
+        output = fc1_out.sigmoid().view(embeddings.shape[0])
+        return output
 
 
 # Evaluation helper methods

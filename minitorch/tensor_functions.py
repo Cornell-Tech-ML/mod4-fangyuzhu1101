@@ -66,21 +66,25 @@ class Function:
 class Neg(Function):
     @staticmethod
     def forward(ctx: Context, t1: Tensor) -> Tensor:
+        """Performs element-wise negation of the input tensor."""
         return t1.f.neg_map(t1)
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        """Negates the gradient during backpropagation."""
         return grad_output.f.neg_map(grad_output)
 
 
 class Inv(Function):
     @staticmethod
     def forward(ctx: Context, t1: Tensor) -> Tensor:
+        """Performs element-wise inverse of the input tensor."""
         ctx.save_for_backward(t1)
         return t1.f.inv_map(t1)
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        """Apply Inv derivative element-wise."""
         (t1,) = ctx.saved_values
         return grad_output.f.inv_back_zip(t1, grad_output)
 
@@ -88,10 +92,12 @@ class Inv(Function):
 class Add(Function):
     @staticmethod
     def forward(ctx: Context, t1: Tensor, t2: Tensor) -> Tensor:
+        """Element-wise addition of two tensors."""
         return t1.f.add_zip(t1, t2)
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+        """Derivative of the addition function."""
         return grad_output, grad_output
 
 
@@ -105,11 +111,194 @@ class All(Function):
             return a.f.mul_reduce(a.contiguous().view(int(operators.prod(a.shape))), 0)
 
 
+# TODO: Implement for Task 2.3.
+class Mul(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
+        """Element-wise multiplication of two tensors."""
+        # ASSIGN2.3
+        ctx.save_for_backward(a, b)
+        return a.f.mul_zip(a, b)
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+        """Derivative of the multiply function."""
+        # ASSIGN2.4
+        a, b = ctx.saved_values
+        return (
+            grad_output.f.mul_zip(b, grad_output),
+            grad_output.f.mul_zip(a, grad_output),
+        )
+        # END ASSIGN2.4
+
+
+class Sigmoid(Function):
+    @staticmethod
+    def forward(ctx: Context, t1: Tensor) -> Tensor:
+        """Apply the sigmoid function element-wise."""
+        # ASSIGN2.3
+        out = t1.f.sigmoid_map(t1)
+        ctx.save_for_backward(out)
+        return out
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        """Derivative of the sigmoid function, sigmoid(x) * (1 - sigmoid(x)) * grad_output."""
+        # ASSIGN2.4
+        sigma: Tensor = ctx.saved_values[0]
+        return sigma * (-sigma + 1.0) * grad_output
+        # END ASSIGN2.4
+
+
+class ReLU(Function):
+    @staticmethod
+    def forward(ctx: Context, t1: Tensor) -> Tensor:
+        """Apply ReLU function element-wise."""
+        # ASSIGN2.3
+        ctx.save_for_backward(t1)
+        return t1.f.relu_map(t1)
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        """Apply ReLU derivative element-wise."""
+        # ASSIGN2.4
+        (a,) = ctx.saved_values
+        return grad_output.f.relu_back_zip(a, grad_output)
+        # END ASSIGN2.4
+
+
+class Log(Function):
+    @staticmethod
+    def forward(ctx: Context, t1: Tensor) -> Tensor:
+        """Apply the natural logarithm function element-wise."""
+        # ASSIGN2.3
+        ctx.save_for_backward(t1)
+        out = t1.f.log_map(t1)
+        return out
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        """Derivative of the log function."""
+        # ASSIGN2.4
+        (a,) = ctx.saved_values
+        return grad_output.f.log_back_zip(a, grad_output)
+        # END ASSIGN2.4
+
+
+class Exp(Function):
+    @staticmethod
+    def forward(ctx: Context, t1: Tensor) -> Tensor:
+        """Apply the exponential function element-wise."""
+        # ASSIGN2.3
+        out = t1.f.exp_map(t1)
+        ctx.save_for_backward(out)
+        return out
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        """Derivative of the exponential function, exp(x) * grad_output."""
+        # ASSIGN2.4
+        (a,) = ctx.saved_values
+        return grad_output.f.mul_zip(a, grad_output)
+        # END ASSIGN2.4
+
+
+class LT(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
+        """Element-wise less-than comparison of two tensors."""
+        # ASSIGN2.3
+        ctx.save_for_backward(a.shape, b.shape)
+        return a.f.lt_zip(a, b)
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+        """No backward operation for comparison, in which the derivative of the less than function is 0."""
+        # ASSIGN2.4
+        a_shape, b_shape = ctx.saved_values
+        return zeros(a_shape), zeros(b_shape)
+        # END ASSIGN2.4
+
+
+class EQ(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
+        """Element-wise equality comparison of two tensors."""
+        # ASSIGN2.3
+        ctx.save_for_backward(a.shape, b.shape)
+        return a.f.eq_zip(a, b)
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+        """No backward operation for comparison, in which the derivative of the equal function is 0."""
+        # sASSIGN2.4
+        a_shape, b_shape = ctx.saved_values
+        return zeros(a_shape), zeros(b_shape)
+        # END ASSIGN2.4
+
+
+class IsClose(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
+        """(No backward operation): Element-wise comparison to check if values are close or values in t1 and t2 are close within a tolerance."""
+        # ASSIGN2.3
+        return a.f.is_close_zip(a, b)
+        # END ASSIGN2.3
+
+
+class Permute(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, order: Tensor) -> Tensor:
+        """Permute the dimensions of the tensor."""
+        # ASSIGN2.3
+        ctx.save_for_backward(order)
+        return a._new(a._tensor.permute(*[int(order[i]) for i in range(order.size)]))
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, float]:
+        """Reverse the permutation of the dimensions with gradients back to the original order."""
+        # ASSIGN2.4
+        order: Tensor = ctx.saved_values[0]
+        order2: List[int] = [
+            a[0]
+            for a in sorted(
+                enumerate([order[i] for i in range(order.size)]), key=lambda a: a[1]
+            )
+        ]
+        return grad_output._new(grad_output._tensor.permute(*order2)), 0.0
+        # END ASSIGN2.4
+
+
+class Sum(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, dim: Tensor) -> Tensor:
+        """Sum the tensor along a specified dimension."""
+        # ASSIGN2.3
+        ctx.save_for_backward(a.shape, dim)
+        return a.f.add_reduce(a, int(dim.item()))
+        # END ASSIGN2.3
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, float]:
+        """Gradient of the sum function."""
+        # ASSIGN2.4
+        a_shape, dim = ctx.saved_values
+        return grad_output, 0.0
+        # END ASSIGN2.4
 
 
 class View(Function):
     @staticmethod
     def forward(ctx: Context, a: Tensor, shape: Tensor) -> Tensor:
+        """Reshapes the input tensor to the specified shape without changing the data."""
         ctx.save_for_backward(a.shape)
         assert a._tensor.is_contiguous(), "Must be contiguous to view"
         shape2 = [int(shape[i]) for i in range(shape.size)]
@@ -272,6 +461,23 @@ def tensor(
 def grad_central_difference(
     f: Any, *vals: Tensor, arg: int = 0, epsilon: float = 1e-6, ind: UserIndex
 ) -> float:
+    """Approximates the gradient of a function using central difference by perturbing
+    the input tensor `vals[arg]` by a small amount `epsilon` at a specific index `ind`
+    and computes the central difference.
+
+    Args:
+    ----
+        f (Any): The function whose gradient is being approximated.
+        vals (Tensor): The input tensors to the function.
+        arg (int): The index of the argument in `vals` to compute the gradient for.
+        epsilon (float): The small perturbation used to approximate the gradient.
+        ind (UserIndex): The specific index where the perturbation is applied.
+
+    Returns:
+    -------
+        float: The approximated gradient at the given index.
+
+    """
     x = vals[arg]
     up = zeros(x.shape)
     up[ind] = epsilon
